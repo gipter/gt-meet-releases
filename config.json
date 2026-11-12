@@ -1,0 +1,23 @@
+{
+  "static": true,
+  "local": false,
+  "appMode": false,
+  "canHost": false,
+  "needHostCode": false,
+  "maxRoom": 8,
+  "iceServers": [
+    {
+      "urls": [
+        "stun:stun.l.google.com:19302",
+        "stun:stun1.l.google.com:19302"
+      ]
+    }
+  ],
+  "proto": 2,
+  "minProto": 2,
+  "version": "1.0.13",
+  "tunnel": {
+    "state": "off"
+  },
+  "fx": "cdn"
+}

@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GT-Meet">
+<title>GT-Meet 화상회의</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+
+<!-- ===== 대기실 ===== -->
+<section id="lobby" class="screen">
+  <div class="lobby-card">
+    <div class="lobby-preview">
+      <video id="previewVideo" autoplay playsinline muted></video>
+      <div class="preview-off" id="previewOff">카메라 꺼짐</div>
+      <div class="fx-busy" hidden>배경 효과 준비 중…</div>
+      <div class="preview-ctrls">
+        <button class="round" id="pvMic" title="마이크 켜기/끄기"></button>
+        <button class="round" id="pvCam" title="카메라 켜기/끄기"></button>
+      </div>
+      <div class="meter"><i id="pvMeter"></i></div>
+    </div>
+    <div class="lobby-form">
+      <div class="brand"><h1><img class="logo-img" src="icon-192.png" alt=""> GT-Meet</h1>
+        <div class="brand-btns"><button class="chip" id="btnInstall" hidden>📥 앱으로 설치</button><select class="lang-sel" id="langSel" title="언어"></select><button class="chip" id="btnHelp">❓ 도움말</button><button class="chip" id="btnSettings">⚙ 설정</button></div></div>
+      <div class="net" id="netBox" hidden></div>
+      <div class="net upd" id="updBox" hidden></div>
+      <label>내 이름<input id="inName" maxlength="30" placeholder="회의에 표시될 이름" autocomplete="name"></label>
+
+      <!-- 시작 / 참여 선택 -->
+      <div id="choose" class="choose">
+        <button class="big start" id="btnStart"><i>＋</i><b>새 회의 시작</b><span>회의 ID·비밀번호가 자동으로 만들어집니다</span></button>
+        <button class="big join" id="btnShowJoin"><i>➜</i><b>회의 참여</b><span>받은 회의 ID와 비밀번호로 참여합니다</span></button>
+        <label id="hostCodeRow" hidden>회의 개설 코드<input id="inHostCode" type="password" maxlength="64" placeholder="관리자가 알려준 코드"></label>
+      </div>
+
+      <!-- 참여 정보 입력 -->
+      <form id="joinForm" class="joinbox" hidden autocomplete="off">
+        <p class="note small" id="joinHint" hidden>받은 초대문을 복사한 뒤 아래 버튼을 누르거나 회의 ID 칸에 붙여 넣으면 회의 정보가 자동으로 채워집니다.</p>
+        <button type="button" class="ghost" id="btnPaste">📋 초대문 붙여넣기</button>
+        <label>회의 ID<input id="inMeetingId" placeholder="000 000 000" maxlength="400" autocomplete="off"></label>
+        <p class="note small" id="remoteNote" hidden></p>
+        <label>비밀번호<input id="inPw" inputmode="numeric" maxlength="12" placeholder="6자리 숫자"></label>
+        <div class="row2">
+          <button type="button" class="ghost" id="btnBack">← 뒤로</button>
+          <button type="submit" class="primary" id="btnJoin">참여 요청</button>
+        </div>
+      </form>
+
+      <!-- 대기 화면 -->
+      <div id="waitBox" class="waitbox" hidden>
+        <div class="spinner"></div>
+        <b>호스트의 수락을 기다리는 중입니다</b>
+        <span id="waitInfo"></span>
+        <button class="ghost" id="btnCancelWait">요청 취소</button>
+      </div>
+
+      <p class="err" id="lobbyErr"></p>
+      <p class="net" id="iosHint" hidden>📲 앱처럼 쓰려면 Safari의 공유 버튼(□↑)을 누르고 “홈 화면에 추가”를 고르세요.</p>
+      <p class="hint">영상·음성·파일은 참가자끼리 직접 주고받고 서버에 저장되지 않습니다. 녹화·녹취록·캡처는 각자 PC에만 남습니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 회의 화면 ===== -->
+<section id="meeting" class="screen" hidden>
+  <header class="topbar">
+    <div class="tb-left">
+      <button class="chip idchip" id="btnInfo" title="회의 정보·초대">ID <b id="roomLabel"></b></button>
+      <span class="host-badge" id="hostBadge" hidden>👑 호스트</span>
+      <span class="lock-badge" id="lockBadge" hidden>🔒 잠김</span>
+      <span class="timer" id="timer">00:00</span>
+      <span class="rec-badge" id="recBadge" hidden>● 녹화 중</span>
+      <span class="stt-badge" id="sttBadge" hidden>✎ 녹취 중</span>
+    </div>
+    <div class="tb-right">
+      <button class="chip" id="btnInvite">✉ 초대하기</button>
+      <button class="chip" id="btnPanel">☰ 패널</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <main id="grid" class="no-i18n grid"></main>
+    <div class="no-i18n captions" id="captions"></div>
+
+    <aside class="panel" id="panel">
+      <nav class="tabs"><button class="panel-close" id="btnPanelClose" title="닫기">✕</button>
+        <button data-tab="chat" class="on">채팅<b class="dot" id="chatDot" hidden></b></button>
+        <button data-tab="stt">녹취록</button>
+        <button data-tab="shots">캡처 <span id="shotCount">0</span></button>
+        <button data-tab="people">참가자 <span id="peopleCount">1</span></button>
+      </nav>
+
+      <div class="tab on" id="tab-chat">
+        <ul class="no-i18n msgs" id="msgs"></ul>
+        <form class="composer" id="chatForm">
+          <button type="button" class="icon" id="btnAttach" title="파일 보내기">📎</button>
+          <input type="file" id="fileInput" multiple hidden>
+          <textarea id="chatInput" rows="1" placeholder="메시지 입력 (Enter 전송)"></textarea>
+          <button class="icon send" title="전송">➤</button>
+        </form>
+      </div>
+
+      <div class="tab" id="tab-stt">
+        <div class="tab-tools">
+          <select id="sttLang" title="인식 언어">
+            <option value="ko-KR" class="no-i18n">한국어</option><option value="en-US">English</option>
+            <option value="ja-JP">日本語</option><option value="zh-CN">中文</option>
+          </select>
+          <button class="chip" id="btnSttTxt">TXT 저장</button>
+        </div>
+        <p class="note" id="sttNote"></p>
+        <ul class="no-i18n lines" id="sttLines"></ul>
+      </div>
+
+      <div class="tab" id="tab-shots">
+        <div class="tab-tools">
+          <label class="switch"><input type="checkbox" id="autoCap" checked> 자동 캡처</label>
+          <button class="chip" id="btnShotsZip" title="모든 캡처 이미지를 차례로 저장">전체 저장</button>
+        </div>
+        <p class="note">화면공유 시작, 공유 화면 전환(슬라이드 넘김), “중요·결정·마감·액션아이템” 등 핵심어 발화, 📌 북마크 시 자동으로 캡처합니다.</p>
+        <div class="no-i18n shots" id="shots"></div>
+      </div>
+
+      <div class="tab" id="tab-people">
+        <ul class="no-i18n people" id="people"></ul>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="toolbar">
+    <button class="tool" id="tMic"><i></i><span>마이크</span></button>
+    <button class="tool" id="tCam"><i></i><span>카메라</span></button>
+    <button class="tool" id="tScreen"><i>🖥️</i><span>화면공유</span></button>
+    <button class="tool" id="tRec"><i>⏺</i><span>녹화</span></button>
+    <button class="tool" id="tStt"><i>✎</i><span>녹취</span></button>
+    <button class="tool" id="tMark"><i>📌</i><span>중요 표시</span></button>
+    <button class="tool" id="tSettings"><i>⚙</i><span>설정</span></button>
+    <button class="tool" id="tHelp"><i>❓</i><span>도움말</span></button>
+    <button class="tool" id="tExport"><i>📝</i><span>회의록</span></button>
+    <button class="tool danger" id="tLeave"><i>⏻</i><span>나가기</span></button>
+  </footer>
+</section>
+
+<div class="no-i18n knocks" id="knocks"></div>
+<div class="toasts" id="toasts"></div>
+
+<dialog id="infoDlg">
+  <h3>회의 정보</h3>
+  <dl class="info">
+    <dt>회의 ID</dt><dd id="infoId"></dd>
+    <dt>비밀번호</dt><dd id="infoPw"></dd>
+    <dt>호스트</dt><dd id="infoHost"></dd>
+  </dl>
+  <div class="net warn" id="infoNet" hidden></div>
+  <textarea id="inviteText" rows="8" readonly></textarea>
+  <div class="row2">
+    <button class="ghost" id="btnShareInvite" hidden>📤 공유</button>
+    <button class="ghost" id="btnCopyLink">🔗 링크만 복사</button>
+    <button class="primary" id="btnCopyInvite">✉ 초대문 복사</button>
+  </div>
+  <div class="hostonly" id="hostCtl">
+    <label class="switch"><input type="checkbox" id="optWaiting"> 대기실 사용 (입장 시 내 수락 필요)</label>
+    <label class="switch"><input type="checkbox" id="optLock"> 회의 잠금 (새 참가자 차단)</label>
+  </div>
+  <form method="dialog"><button class="ghost wide">닫기</button></form>
+</dialog>
+
+<dialog id="setDlg">
+  <div class="set-head"><h3>설정</h3><span class="saved">변경 내용은 자동 저장됩니다</span></div>
+  <div class="set-grid">
+    <div class="set-prev">
+      <video id="setPreview" autoplay playsinline muted></video>
+      <div class="preview-off" id="setPreviewOff">카메라 꺼짐</div>
+      <div class="fx-busy" hidden>배경 효과 준비 중…</div>
+    </div>
+    <div class="set-body">
+      <section>
+        <h4>장치</h4>
+        <label>카메라<select id="selCam"></select></label>
+        <label>마이크<select id="selMic"></select></label>
+        <div class="checks">
+          <label class="switch"><input type="checkbox" id="optMicOn"> 마이크 켜고 시작</label>
+          <label class="switch"><input type="checkbox" id="optCamOn"> 카메라 켜고 시작</label>
+        </div>
+      </section>
+      <section>
+        <h4>카메라 배경</h4>
+        <div class="seg" id="bgMode">
+          <label><input type="radio" name="bg" value="none"><span>그대로</span></label>
+          <label><input type="radio" name="bg" value="blur"><span>배경 흐림</span></label>
+          <label><input type="radio" name="bg" value="image"><span>배경 바꾸기</span></label>
+        </div>
+        <div class="thumbs" id="bgThumbs"></div>
+        <input type="file" id="bgFile" accept="image/*" hidden>
+        <label class="switch" id="hqRow" hidden><input type="checkbox" id="optHq"> 고품질 배경 처리 (PC 그래픽카드 사용)</label>
+        <p class="note small" id="hqStatus" hidden></p>
+        <label class="switch"><input type="checkbox" id="optPrivacy"> 개인정보 보호 강화 (사람 윤곽을 조금 더 안쪽으로 잘라 방이 비치지 않게)</label>
+        <p class="note small">배경 흐림은 방을 흐리게 보여 줄 뿐 가려 주지 않습니다. 방을 숨기려면 '배경 바꾸기'를 쓰세요.</p>
+        <p class="note small">사람과 배경을 이 PC 안에서 구분합니다(영상이 외부로 나가지 않음). 처음 한 번은 준비에 몇 초 걸립니다.</p>
+      </section>
+      <section>
+        <h4>카메라를 껐을 때 보여줄 그림</h4>
+        <div class="offpic">
+          <div class="offthumb" id="offThumb"><span>그림 없음<br>(이름 첫 글자 표시)</span></div>
+          <div class="col">
+            <button class="ghost" id="btnOffPick">그림 선택</button>
+            <button class="ghost" id="btnOffClear">지우기</button>
+          </div>
+        </div>
+        <input type="file" id="offFile" accept="image/*" hidden>
+      </section>
+      <section>
+        <h4>기타</h4>
+        <label>언어<select id="optLang"></select></label>
+        <label>녹취 언어<select id="optSttLang">
+          <option value="ko-KR" class="no-i18n">한국어</option><option value="en-US">English</option><option value="ja-JP">日本語</option><option value="zh-CN">中文</option>
+        </select></label>
+        <label class="switch"><input type="checkbox" id="optAutoCap"> 중요 시점 자동 캡처</label>
+      </section>
+      <section id="aboutSection" hidden>
+        <h4>프로그램 정보</h4>
+        <div class="about"><img src="icon-192.png" alt=""><div><b>GT-Meet</b> <span id="appVer"></span><br><span id="updLine" class="note small"></span></div></div>
+        <div class="row2"><button class="ghost" id="btnUpdCheck">업데이트 확인</button><button class="primary" id="btnUpdInstall" hidden>지금 다시 시작</button></div>
+      </section>
+      <section id="netSection" hidden>
+        <h4>외부 접속</h4>
+        <label class="switch"><input type="checkbox" id="optTunnelAuto"> 프로그램을 켜면 외부 접속도 자동으로 켜기</label>
+        <p class="note small">외부 접속을 켜면 인터넷 어디서나 초대 링크(또는 회의 ID·비밀번호)로 참여할 수 있습니다. 이 PC에서만 회의를 열 수 있고, 외부 사람은 참여만 가능합니다.</p>
+      </section>
+    </div>
+  </div>
+  <form method="dialog"><button class="primary wide">완료</button></form>
+</dialog>
+
+<dialog id="helpDlg" class="help-dlg">
+  <div class="help-head"><h3>사용 설명서</h3><form method="dialog"><button class="ghost">닫기</button></form></div>
+  <div class="help-wrap"><nav class="help-toc" id="helpToc"></nav><article class="help-body no-i18n" id="helpBody"></article></div>
+</dialog>
+
+<dialog id="leaveDlg">
+  <h3>회의에서 나가기</h3>
+  <p>호스트입니다. 어떻게 할까요?</p>
+  <div class="col">
+    <button class="primary danger-bg" id="btnEndAll">모두에게 회의 종료</button>
+    <button class="ghost" id="btnLeaveOnly">나만 나가기 (호스트는 다른 참가자에게 넘김)</button>
+    <form method="dialog"><button class="ghost wide">취소</button></form>
+  </div>
+</dialog>
+<dialog id="viewer"><img id="viewerImg" alt=""><p id="viewerCap"></p><form method="dialog"><button class="primary">닫기</button></form></dialog>
+
+<script src="i18n.js"></script>
+<script src="help.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
